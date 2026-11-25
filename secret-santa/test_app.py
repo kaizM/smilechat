@@ -22,7 +22,7 @@ class DrawTest(unittest.TestCase):
                     reg=request(client,'register',name=f'Employee {i}',username=f'emp{i:02}',pin='0123')
                     self.assertFalse(reg['me']['wish']['completed'])
                     self.assertNotIn('recipient',reg['me'])
-                    request(client,'save',wish={'choices':['0:Other'],'other':{'0':f'Gift {i}'}})
+                    request(client,'save',wish={'choices':['0:Other','2:Blue'],'other':{'0':f'Gift {i}'},'custom':f'Custom {i}','sizes':'M','avoid':'Peanuts','links':'https://example.com/gift'})
                     self.assertEqual(client.post('/api',json={'action':'reveal'}).status_code,403)
                     self.assertEqual(client.post('/api',json={'action':'activate'}).status_code,403)
                 self.assertEqual(admin.post('/api',json={'action':'activate'}).status_code,400)
@@ -36,6 +36,18 @@ class DrawTest(unittest.TestCase):
                 self.assertEqual({r['drawNumber'] for r in results},set(range(1,15)))
                 self.assertEqual(len({r['recipient']['name'] for r in results}),14)
                 self.assertTrue(all(r['name']!=r['recipient']['name'] for r in results))
+                for result in results:
+                    recipient = result['recipient']
+                    idx = int(recipient['name'].split()[-1])
+                    self.assertEqual(recipient['wish'], {'choices':['0:Other','2:Blue'],'other':{'0':f'Gift {idx}'},'custom':f'Custom {idx}','sizes':'M','avoid':'Peanuts','links':'https://example.com/gift','completed':True})
+                first_recipient = first['recipient']
+                recipient_idx = int(first_recipient['name'].split()[-1])
+                request(clients[recipient_idx],'save',wish={'choices':['0:Books'],'other':{},'custom':'Updated preference'})
+                refreshed = request(clients[0],'status')['me']
+                self.assertEqual(refreshed['drawNumber'],first['drawNumber'])
+                self.assertEqual(refreshed['recipient']['name'],first_recipient['name'])
+                self.assertEqual(refreshed['recipient']['wish']['custom'],'Updated preference')
+                request(clients[recipient_idx],'save',wish=first_recipient['wish'])
                 self.assertEqual(request(clients[0],'reveal')['me']['drawNumber'],first['drawNumber'])
                 request(clients[0],'logout')
                 signed=request(clients[0],'login',username='emp00',pin='0123')['me']
