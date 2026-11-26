@@ -164,6 +164,16 @@ async def api(request: Request) -> JSONResponse:
         elif action=='logout':
             if token: db.execute('DELETE FROM session WHERE token=?',(digest(token),))
             user=None
+        elif action in ('resetDraw','resetEvent'):
+            if user != 'admin': reject('Administrator only',403)
+            expected = 'RESET DRAW' if action == 'resetDraw' else 'RESET EVENT'
+            if data.get('confirmation') != expected: reject('Reset confirmation required',400)
+            db.execute('UPDATE employee SET recipient=NULL, draw_number=NULL')
+            if action == 'resetEvent':
+                db.execute("DELETE FROM session WHERE username <> 'admin'")
+                db.execute('DELETE FROM employee')
+            db.execute('UPDATE event SET active=0 WHERE id=1')
+            active = False
         elif action in ('approve','remove','activate'):
             if user!='admin': reject('Administrator only',403)
             if active: reject('Draw locked / Sorteo cerrado')
